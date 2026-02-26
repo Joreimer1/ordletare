@@ -386,11 +386,9 @@ const PAGE_SIZE = 50;
 let currentResults = [];
 let displayCount = PAGE_SIZE;
 
-// Load DSSO word list
-const STATUS_URLS = [
-  'https://raw.githubusercontent.com/almgru/svenska-ord.txt/master/svenska-ord.txt',
-  'https://cdn.jsdelivr.net/gh/almgru/svenska-ord.txt@master/svenska-ord.txt',
-];
+// Load DSSO word list with localStorage cache
+const WORD_LIST_URL = 'svenska-ord.txt';
+const CACHE_KEY = 'ordletare_dsso_v1';
 
 async function loadWordList() {
   const status = document.getElementById('status');
@@ -398,58 +396,72 @@ async function loadWordList() {
   const fill = document.getElementById('progressFill');
   const btn = document.getElementById('searchBtn');
 
-  status.className = 'loading';
-  status.innerHTML = '<span class="spinner"></span>Laddar DSSO ordlista…';
-  bar.style.display = 'block';
-
-  for (const url of STATUS_URLS) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-
-      const reader = res.body.getReader();
-      const total = parseInt(res.headers.get('content-length') || '0');
-      let received = 0;
-      const chunks = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total) {
-          fill.style.width = Math.round((received / total) * 100) + '%';
-        }
-      }
-
-      fill.style.width = '100%';
-      const text = new TextDecoder('utf-8').decode(
-        chunks.reduce((a, b) => {
-          const merged = new Uint8Array(a.length + b.length);
-          merged.set(a); merged.set(b, a.length); return merged;
-        })
-      );
-
-      wordList = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
+  // Try cache first
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      wordList = JSON.parse(cached);
       status.className = 'done';
-      status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord inlästa`;
+      status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord (från cache)`;
       btn.disabled = false;
       btn.textContent = 'Sök ord';
-      bar.style.display = 'none';
       return;
-
-    } catch(e) {
-      continue;
     }
-  }
+  } catch(e) {}
 
-  // Fallback: small built-in list
-  status.className = 'error';
-  status.textContent = '⚠ Kunde inte ladda ordlistan. Kontrollera din internetanslutning.';
-  bar.style.display = 'none';
-  btn.textContent = 'Försök igen';
-  btn.disabled = false;
-  btn.onclick = () => { wordList = null; btn.onclick = search; loadWordList(); };
+  // Fetch from network
+  status.className = 'loading';
+  status.innerHTML = '<span class="spinner"></span>Laddar DSSO ordlista (första gången)…';
+  bar.style.display = 'block';
+
+  try {
+    const res = await fetch(WORD_LIST_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const reader = res.body.getReader();
+    const total = parseInt(res.headers.get('content-length') || '0');
+    let received = 0;
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total) fill.style.width = Math.round((received / total) * 100) + '%';
+    }
+
+    fill.style.width = '100%';
+    const text = new TextDecoder('utf-8').decode(
+      chunks.reduce((a, b) => {
+        const merged = new Uint8Array(a.length + b.length);
+        merged.set(a); merged.set(b, a.length); return merged;
+      })
+    );
+
+    wordList = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
+
+    // Save to cache
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(wordList));
+    } catch(e) {
+      // localStorage full or unavailable – continue without cache
+    }
+
+    status.className = 'done';
+    status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord inlästa och sparade`;
+    btn.disabled = false;
+    btn.textContent = 'Sök ord';
+    bar.style.display = 'none';
+
+  } catch(e) {
+    status.className = 'error';
+    status.textContent = '⚠ Kunde inte ladda ordlistan. Kontrollera anslutningen.';
+    bar.style.display = 'none';
+    btn.textContent = 'Försök igen';
+    btn.disabled = false;
+    btn.onclick = () => { wordList = null; btn.onclick = search; loadWordList(); };
+  }
 }
 
 // Check if a word can be formed from available letters
