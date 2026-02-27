@@ -353,8 +353,8 @@
   <div>
     <label style="margin-bottom:8px;display:block;">Minsta ordlängd</label>
     <div class="filter-group" id="minLenGroup">
-      <button class="filter-btn" data-len="2">2+</button>
-      <button class="filter-btn active" data-len="3">3+</button>
+      <button class="filter-btn active" data-len="2">2+</button>
+      <button class="filter-btn" data-len="3">3+</button>
       <button class="filter-btn" data-len="4">4+</button>
       <button class="filter-btn" data-len="5">5+</button>
     </div>
@@ -380,7 +380,7 @@
 
 <script>
 let wordList = null;
-let minLen = 3;
+let minLen = 2;
 let sortMode = 'length';
 const PAGE_SIZE = 50;
 let currentResults = [];
@@ -388,7 +388,8 @@ let displayCount = PAGE_SIZE;
 
 // Load DSSO word list with localStorage cache
 const WORD_LIST_URL = 'svenska-ord.txt';
-const CACHE_KEY = 'ordletare_dsso_v1';
+const CACHE_KEY = 'ordletare_dsso_v3';
+const MIN_WORDS = 10000;
 
 async function loadWordList() {
   const status = document.getElementById('status');
@@ -400,14 +401,19 @@ async function loadWordList() {
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
-      wordList = JSON.parse(cached);
-      status.className = 'done';
-      status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord (från cache)`;
-      btn.disabled = false;
-      btn.textContent = 'Sök ord';
-      return;
+      const parsed = JSON.parse(cached);
+      if (parsed.length >= MIN_WORDS) {
+        wordList = parsed;
+        status.className = 'done';
+        status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord (från cache)`;
+        btn.disabled = false;
+        btn.textContent = 'Sök ord';
+        return;
+      } else {
+        localStorage.removeItem(CACHE_KEY); // ogiltig cache, ta bort
+      }
     }
-  } catch(e) {}
+  } catch(e) { localStorage.removeItem(CACHE_KEY); }
 
   // Fetch from network
   status.className = 'loading';
@@ -439,7 +445,7 @@ async function loadWordList() {
       })
     );
 
-    wordList = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
+    wordList = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2 && /^[a-zåäö]+$/.test(w));
 
     // Save to cache
     try {
