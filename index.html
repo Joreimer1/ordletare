@@ -532,10 +532,17 @@ function search() {
 
     const matches = wordList.filter(word => {
       if (word.length < minLen) return false;
-      if (letters.length > 0 && word.length > letters.length) return false;
       if (sw && !word.startsWith(sw)) return false;
       if (ew && !word.endsWith(ew)) return false;
-      if (letters.length > 0 && !canForm(word, letters)) return false;
+      // If letters given: the middle part of the word (excluding sw/ew) must be formable from letters
+      if (letters.length > 0) {
+        const start = sw.length;
+        const end = ew.length > 0 ? word.length - ew.length : word.length;
+        if (start > end) return false;
+        const middle = word.slice(start, end);
+        if (middle.length > letters.length) return false;
+        if (!canForm(middle, letters)) return false;
+      }
       return true;
     });
 
