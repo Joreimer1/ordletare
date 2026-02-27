@@ -510,13 +510,16 @@ function search() {
   if (!wordList) { loadWordList(); return; }
 
   const raw = document.getElementById('letters').value.trim().toUpperCase();
-  if (!raw) return;
+  const sw = document.getElementById('startsWith').value.trim().toLowerCase();
+  const ew = document.getElementById('endsWith').value.trim().toLowerCase();
+
+  if (!raw && !sw && !ew) return;
 
   // Normalize: treat ? as *, split by spaces
   const groups = raw.replace(/\?/g, '*').split(/\s+/).filter(Boolean);
   const letters = [...groups.join('')].map(c => c.toLowerCase());
 
-  if (letters.length === 0 || letters.length > 10) return;
+  if (letters.length > 10) return;
 
   const status = document.getElementById('status');
   status.className = 'loading';
@@ -527,14 +530,13 @@ function search() {
     const wildcardCount = letters.filter(c => c === '*').length;
     const realLetters = letters.filter(c => c !== '*');
 
-    const sw = document.getElementById('startsWith').value.trim().toLowerCase();
-    const ew = document.getElementById('endsWith').value.trim().toLowerCase();
-
     const matches = wordList.filter(word => {
-      if (word.length < minLen || word.length > letters.length) return false;
+      if (word.length < minLen) return false;
+      if (letters.length > 0 && word.length > letters.length) return false;
       if (sw && !word.startsWith(sw)) return false;
       if (ew && !word.endsWith(ew)) return false;
-      return canForm(word, letters);
+      if (letters.length > 0 && !canForm(word, letters)) return false;
+      return true;
     });
 
     if (sortMode === 'length') {
