@@ -368,6 +368,21 @@
     </div>
   </div>
 
+  <div style="display:flex;gap:12px;">
+    <div class="input-section" style="flex:1">
+      <label for="startsWith">Börjar med</label>
+      <div class="input-wrap">
+        <input type="text" id="startsWith" placeholder="t.ex. KA" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
+      </div>
+    </div>
+    <div class="input-section" style="flex:1">
+      <label for="endsWith">Slutar med</label>
+      <div class="input-wrap">
+        <input type="text" id="endsWith" placeholder="t.ex. EN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
+      </div>
+    </div>
+  </div>
+
   <button class="search-btn" id="searchBtn" disabled>Laddar ordlista…</button>
 
   <div id="status"></div>
@@ -512,8 +527,13 @@ function search() {
     const wildcardCount = letters.filter(c => c === '*').length;
     const realLetters = letters.filter(c => c !== '*');
 
+    const sw = document.getElementById('startsWith').value.trim().toLowerCase();
+    const ew = document.getElementById('endsWith').value.trim().toLowerCase();
+
     const matches = wordList.filter(word => {
       if (word.length < minLen || word.length > letters.length) return false;
+      if (sw && !word.startsWith(sw)) return false;
+      if (ew && !word.endsWith(ew)) return false;
       return canForm(word, letters);
     });
 
@@ -579,6 +599,12 @@ document.getElementById('letters').addEventListener('input', function() {
 });
 
 document.getElementById('letters').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+document.getElementById('startsWith').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+document.getElementById('endsWith').addEventListener('keydown', e => {
   if (e.key === 'Enter') search();
 });
 
