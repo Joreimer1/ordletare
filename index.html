@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Ordletaren</title>
+<title>Ordletare</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -333,7 +333,7 @@
 <body>
 
 <header>
-  <h1>Ordletaren</h1>
+  <h1>Ordletare</h1>
   <span class="subtitle">DSSO • Svenska ord</span>
 </header>
 
@@ -462,13 +462,24 @@ async function loadWordList() {
     const text = new TextDecoder('utf-8').decode(merged);
 
     const allWords = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
-    // Debug: log to console so we can inspect file format
-    console.log('Totalt rader (längd>=2):', allWords.length);
-    console.log('Första 5 ord:', allWords.slice(0, 5));
-    if (allWords[0]) console.log('Tecken i ord[0]:', [...allWords[0]].map(c => c + '(' + c.charCodeAt(0) + ')').join(' '));
     // Accept all unicode letters (handles é, ü, ñ etc. utöver å ä ö)
     wordList = allWords.filter(w => /^[\p{L}]+$/u.test(w));
-    console.log('Ord kvar efter filter:', wordList.length);
+
+    // Show diagnostics in UI
+    const firstWord = allWords[0] || '';
+    const firstWordCodes = [...firstWord].map(c => c + '(' + c.charCodeAt(0) + ')').join(' ');
+    const diagEl = document.getElementById('results');
+    diagEl.innerHTML = `<div style="font-size:0.72rem;color:var(--accent2);line-height:2;padding:12px;background:var(--surface);border-radius:8px;word-break:break-all">
+      <b>Diagnostik:</b><br>
+      Råtext längd: ${text.length} tecken<br>
+      Rader totalt: ${text.split('\\n').length}<br>
+      Rader längd>=2: ${allWords.length}<br>
+      Ord efter filter: ${wordList.length}<br>
+      Första ord: "${firstWord}"<br>
+      Tecken i första ord: ${firstWordCodes || 'n/a'}<br>
+      Rad 2: "${allWords[1] || ''}"<br>
+      Rad 3: "${allWords[2] || ''}"
+    </div>`;
 
     // Save to cache (skip if list is very large – may exceed localStorage quota)
     try {
