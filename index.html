@@ -459,27 +459,18 @@ async function loadWordList() {
     const merged = new Uint8Array(totalBytes);
     let offset = 0;
     for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
-    const text = new TextDecoder('utf-8').decode(merged);
-
-    const allWords = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
-    // Accept all unicode letters (handles é, ü, ñ etc. utöver å ä ö)
+    // Detect encoding from BOM bytes
+    let text;
+    if ((merged[0] === 0xFF && merged[1] === 0xFE) || (merged[0] === 0xFE && merged[1] === 0xFF)) {
+      text = new TextDecoder('utf-16').decode(merged);
+    } else {
+      text = new TextDecoder('utf-8').decode(merged);
+    }
+    // Strip BOM character, handle \r\n, \r, or \n line endings
+    const cleaned = text.replace(/^\uFEFF/, '');
+    const allWords = cleaned.split(/\r\n|\r|\n/).map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
+    // Accept all unicode letters
     wordList = allWords.filter(w => /^[\p{L}]+$/u.test(w));
-
-    // Show diagnostics in UI
-    const firstWord = allWords[0] || '';
-    const firstWordCodes = [...firstWord].map(c => c + '(' + c.charCodeAt(0) + ')').join(' ');
-    const diagEl = document.getElementById('results');
-    diagEl.innerHTML = `<div style="font-size:0.72rem;color:var(--accent2);line-height:2;padding:12px;background:var(--surface);border-radius:8px;word-break:break-all">
-      <b>Diagnostik:</b><br>
-      Råtext längd: ${text.length} tecken<br>
-      Rader totalt: ${text.split('\\n').length}<br>
-      Rader längd>=2: ${allWords.length}<br>
-      Ord efter filter: ${wordList.length}<br>
-      Första ord: "${firstWord}"<br>
-      Tecken i första ord: ${firstWordCodes || 'n/a'}<br>
-      Rad 2: "${allWords[1] || ''}"<br>
-      Rad 3: "${allWords[2] || ''}"
-    </div>`;
 
     // Save to cache (skip if list is very large – may exceed localStorage quota)
     try {
