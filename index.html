@@ -657,7 +657,13 @@ document.getElementById('sortGroup').addEventListener('click', e => {
   }
 });
 
-document.getElementById('searchBtn').addEventListener('click', search);
+// Fix iOS double-tap: use touchend to fire search before keyboard dismisses
+const searchBtn = document.getElementById('searchBtn');
+searchBtn.addEventListener('touchend', e => {
+  e.preventDefault();
+  search();
+});
+searchBtn.addEventListener('click', search);
 
 // Start loading
 loadWordList();
