@@ -461,7 +461,14 @@ async function loadWordList() {
     for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
     const text = new TextDecoder('utf-8').decode(merged);
 
-    wordList = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2 && /^[a-zåäö]+$/.test(w));
+    const allWords = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
+    // Debug: log to console so we can inspect file format
+    console.log('Totalt rader (längd>=2):', allWords.length);
+    console.log('Första 5 ord:', allWords.slice(0, 5));
+    if (allWords[0]) console.log('Tecken i ord[0]:', [...allWords[0]].map(c => c + '(' + c.charCodeAt(0) + ')').join(' '));
+    // Accept all unicode letters (handles é, ü, ñ etc. utöver å ä ö)
+    wordList = allWords.filter(w => /^[\p{L}]+$/u.test(w));
+    console.log('Ord kvar efter filter:', wordList.length);
 
     // Save to cache (skip if list is very large – may exceed localStorage quota)
     try {
