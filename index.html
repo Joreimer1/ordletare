@@ -315,6 +315,37 @@
 
   .show-more-btn:hover { color: var(--text); border-color: var(--accent); }
 
+  .clear-btn {
+    position: absolute;
+    right: 44px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    display: none;
+    -webkit-appearance: none;
+    z-index: 1;
+  }
+  .clear-btn.visible { display: block; }
+  .clear-btn:hover { color: var(--text); }
+
+  .word-points {
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 2px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-weight: 500;
+    min-width: 32px;
+    text-align: center;
+  }
+
   .progress-bar {
     height: 2px;
     background: var(--border);
@@ -342,6 +373,7 @@
     <label for="letters">Dina bokstäver (max 10)</label>
     <div class="input-wrap">
       <input type="text" id="letters" maxlength="10" placeholder="t.ex. ABCDE eller AB*DE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <button class="clear-btn" id="clearLetters" tabindex="-1" aria-label="Rensa">✕</button>
       <span class="char-count" id="charCount">0/10</span>
     </div>
     <p class="hint">
@@ -365,6 +397,7 @@
     <div class="filter-group" id="sortGroup">
       <button class="filter-btn active" data-sort="length">Längd ↓</button>
       <button class="filter-btn" data-sort="alpha">A–Ö</button>
+      <button class="filter-btn" data-sort="points">Poäng ↓</button>
     </div>
   </div>
 
@@ -397,6 +430,16 @@
 let wordList = null;
 let minLen = 2;
 let sortMode = 'length';
+
+// Wordfeud Swedish letter values
+const LETTER_POINTS = {
+  a:1, b:4, c:8, d:2, e:1, f:4, g:3, h:4, i:1, j:8, k:3, l:2, m:3,
+  n:1, o:2, p:4, q:10, r:1, s:1, t:1, u:3, v:4, w:8, x:8, y:7, z:10,
+  å:4, ä:3, ö:4
+};
+function wordPoints(word) {
+  return [...word].reduce((sum, c) => sum + (LETTER_POINTS[c] || 0), 0);
+}
 const PAGE_SIZE = 50;
 let currentResults = [];
 let displayCount = PAGE_SIZE;
@@ -563,6 +606,8 @@ function search() {
 
     if (sortMode === 'length') {
       matches.sort((a, b) => b.length - a.length || a.localeCompare(b, 'sv'));
+    } else if (sortMode === 'points') {
+      matches.sort((a, b) => wordPoints(b) - wordPoints(a) || b.length - a.length);
     } else {
       matches.sort((a, b) => a.localeCompare(b, 'sv'));
     }
@@ -587,10 +632,14 @@ function renderResults() {
     return;
   }
 
+  const showPoints = sortMode === 'points';
   const rows = slice.map((w, i) =>
     `<div class="word-row" style="animation-delay:${Math.min(i, 30) * 10}ms">
       <span class="word-text">${w}</span>
-      <span class="word-len">${w.length}</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        ${showPoints ? `<span class="word-points">${wordPoints(w)}p</span>` : ''}
+        <span class="word-len">${w.length}</span>
+      </span>
     </div>`
   ).join('');
 
@@ -620,6 +669,20 @@ document.getElementById('letters').addEventListener('input', function() {
   const len = this.value.replace(/\s/g, '').length;
   document.getElementById('charCount').textContent = `${Math.min(len,10)}/10`;
   if (len > 10) this.value = this.value.slice(0, this.value.length - (len - 10));
+  document.getElementById('clearLetters').classList.toggle('visible', this.value.length > 0);
+});
+document.getElementById('clearLetters').addEventListener('touchend', e => {
+  e.preventDefault();
+  document.getElementById('letters').value = '';
+  document.getElementById('charCount').textContent = '0/10';
+  document.getElementById('clearLetters').classList.remove('visible');
+  document.getElementById('letters').focus();
+});
+document.getElementById('clearLetters').addEventListener('click', function() {
+  document.getElementById('letters').value = '';
+  document.getElementById('charCount').textContent = '0/10';
+  this.classList.remove('visible');
+  document.getElementById('letters').focus();
 });
 
 document.getElementById('letters').addEventListener('keydown', e => {
@@ -649,6 +712,8 @@ document.getElementById('sortGroup').addEventListener('click', e => {
   if (currentResults.length > 0) {
     if (sortMode === 'length') {
       currentResults.sort((a, b) => b.length - a.length || a.localeCompare(b, 'sv'));
+    } else if (sortMode === 'points') {
+      currentResults.sort((a, b) => wordPoints(b) - wordPoints(a) || b.length - a.length);
     } else {
       currentResults.sort((a, b) => a.localeCompare(b, 'sv'));
     }
