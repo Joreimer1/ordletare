@@ -334,6 +334,19 @@
   .clear-btn.visible { display: block; }
   .clear-btn:hover { color: var(--text); }
 
+  .length-group-header {
+    padding: 7px 16px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
   .word-points {
     font-size: 0.72rem;
     color: var(--accent);
@@ -413,6 +426,14 @@
       <div class="input-wrap">
         <input type="text" id="endsWith" placeholder="t.ex. EN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
       </div>
+    </div>
+  </div>
+
+  <div class="input-section">
+    <label for="mustContain">Måste innehålla</label>
+    <div class="input-wrap">
+      <input type="text" id="mustContain" placeholder="t.ex. REN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 40px 11px 14px;letter-spacing:0.1em;">
+      <button class="clear-btn" id="clearMustContain" tabindex="-1" aria-label="Rensa">✕</button>
     </div>
   </div>
 
@@ -570,8 +591,9 @@ function search() {
   const raw = document.getElementById('letters').value.trim().toUpperCase();
   const sw = document.getElementById('startsWith').value.trim().toLowerCase();
   const ew = document.getElementById('endsWith').value.trim().toLowerCase();
+  const mc = document.getElementById('mustContain').value.trim().toLowerCase();
 
-  if (!raw && !sw && !ew) return;
+  if (!raw && !sw && !ew && !mc) return;
 
   // Normalize: treat ? as *, split by spaces
   const groups = raw.replace(/\?/g, '*').split(/\s+/).filter(Boolean);
@@ -592,6 +614,7 @@ function search() {
       if (word.length < minLen) return false;
       if (sw && !word.startsWith(sw)) return false;
       if (ew && !word.endsWith(ew)) return false;
+      if (mc && !word.includes(mc)) return false;
       // If letters given: the middle part of the word (excluding sw/ew) must be formable from letters
       if (letters.length > 0) {
         const start = sw.length;
@@ -633,15 +656,33 @@ function renderResults() {
   }
 
   const showPoints = sortMode === 'points';
-  const rows = slice.map((w, i) =>
-    `<div class="word-row" style="animation-delay:${Math.min(i, 30) * 10}ms">
-      <span class="word-text">${w}</span>
-      <span style="display:flex;gap:6px;align-items:center">
-        ${showPoints ? `<span class="word-points">${wordPoints(w)}p</span>` : ''}
+  let rows = '';
+
+  if (sortMode === 'length') {
+    // Group by word length
+    let lastLen = null;
+    slice.forEach((w, i) => {
+      if (w.length !== lastLen) {
+        const count = currentResults.filter(x => x.length === w.length).length;
+        rows += `<div class="length-group-header">${w.length} bokstäver <span style="color:var(--accent);margin-left:6px">${count}</span></div>`;
+        lastLen = w.length;
+      }
+      rows += `<div class="word-row" style="animation-delay:${Math.min(i, 30) * 10}ms">
+        <span class="word-text">${w}</span>
         <span class="word-len">${w.length}</span>
-      </span>
-    </div>`
-  ).join('');
+      </div>`;
+    });
+  } else {
+    slice.forEach((w, i) => {
+      rows += `<div class="word-row" style="animation-delay:${Math.min(i, 30) * 10}ms">
+        <span class="word-text">${w}</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          ${showPoints ? `<span class="word-points">${wordPoints(w)}p</span>` : ''}
+          <span class="word-len">${w.length}</span>
+        </span>
+      </div>`;
+    });
+  }
 
   const showMore = currentResults.length > displayCount
     ? `<button class="show-more-btn" id="showMoreBtn">Visa fler (${currentResults.length - displayCount} kvar)</button>`
@@ -693,6 +734,23 @@ document.getElementById('startsWith').addEventListener('keydown', e => {
 });
 document.getElementById('endsWith').addEventListener('keydown', e => {
   if (e.key === 'Enter') search();
+});
+document.getElementById('mustContain').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
+document.getElementById('mustContain').addEventListener('input', function() {
+  document.getElementById('clearMustContain').classList.toggle('visible', this.value.length > 0);
+});
+document.getElementById('clearMustContain').addEventListener('touchend', e => {
+  e.preventDefault();
+  document.getElementById('mustContain').value = '';
+  document.getElementById('clearMustContain').classList.remove('visible');
+  document.getElementById('mustContain').focus();
+});
+document.getElementById('clearMustContain').addEventListener('click', function() {
+  document.getElementById('mustContain').value = '';
+  this.classList.remove('visible');
+  document.getElementById('mustContain').focus();
 });
 
 document.getElementById('minLenGroup').addEventListener('click', e => {
