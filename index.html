@@ -385,12 +385,12 @@
   <div class="input-section">
     <label for="letters">Dina bokstäver (max 10)</label>
     <div class="input-wrap">
-      <input type="text" id="letters" maxlength="20" placeholder="t.ex. ABCDE eller AB CDE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <input type="text" id="letters" maxlength="20" placeholder="t.ex. ABCDE (mellanslag = *)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
       <button class="clear-btn" id="clearLetters" tabindex="-1" aria-label="Rensa">✕</button>
       <span class="char-count" id="charCount">0/10</span>
     </div>
     <p class="hint">
-      Separera flera ord med <span>mellanslag</span> – resultaten är alltid hela ord.
+      Tryck <span>mellanslag</span> för att infoga en wildcard <span>*</span> (valfri bokstav).
     </p>
   </div>
 
@@ -562,7 +562,13 @@ function canForm(word, letters) {
     if (idx !== -1) {
       available.splice(idx, 1);
     } else {
-      return false;
+      // try wildcard
+      const wIdx = available.indexOf('*');
+      if (wIdx !== -1) {
+        available.splice(wIdx, 1);
+      } else {
+        return false;
+      }
     }
   }
   return true;
@@ -578,9 +584,8 @@ function search() {
 
   if (!raw && !sw && !ew && !mc) return;
 
-  // Normalize: split by spaces, no wildcards
-  const groups = raw.split(/\s+/).filter(Boolean);
-  const letters = [...groups.join('')].map(c => c.toLowerCase());
+  // Normalize: spaces already converted to * by input handler
+  const letters = [...raw.toLowerCase()].map(c => c === ' ' ? '*' : c);
 
   if (letters.length > 10) return;
 
@@ -690,7 +695,12 @@ function renderResults() {
 
 // Event listeners
 document.getElementById('letters').addEventListener('input', function() {
-  const len = this.value.replace(/\s/g, '').length;
+  // Convert spaces to wildcards
+  const cursorPos = this.selectionStart;
+  const hadSpace = this.value.includes(' ');
+  this.value = this.value.replace(/ /g, '*');
+  if (hadSpace) this.setSelectionRange(cursorPos, cursorPos);
+  const len = this.value.length;
   document.getElementById('charCount').textContent = `${len}/10`;
   document.getElementById('clearLetters').classList.toggle('visible', this.value.length > 0);
 });
