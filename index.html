@@ -378,7 +378,7 @@
 
 <header>
   <h1>Ordletare</h1>
-  <span class="subtitle">DSSO • Svenska ord</span>
+  <span class="subtitle">Svenska ord</span>
 </header>
 
 <main>
@@ -465,9 +465,9 @@ const PAGE_SIZE = 50;
 let currentResults = [];
 let displayCount = PAGE_SIZE;
 
-// Load DSSO word list with localStorage cache
+// Load word list with localStorage cache
 const WORD_LIST_URL = 'svenska-ord.txt';
-const CACHE_KEY = 'ordletare_dsso_v3';
+const CACHE_KEY = 'ordletare';
 const MIN_WORDS = 10000;
 
 async function loadWordList() {
@@ -496,7 +496,7 @@ async function loadWordList() {
 
   // Fetch from network
   status.className = 'loading';
-  status.innerHTML = '<span class="spinner"></span>Laddar DSSO ordlista (första gången)…';
+  status.innerHTML = '<span class="spinner"></span>Laddar ordlista (första gången)…';
   bar.style.display = 'block';
 
   try {
