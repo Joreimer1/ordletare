@@ -336,7 +336,7 @@
 
   .length-group-header {
     padding: 7px 16px;
-    font-size: 0.65rem;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--muted);
@@ -385,33 +385,13 @@
   <div class="input-section">
     <label for="letters">Dina bokstäver (max 10)</label>
     <div class="input-wrap">
-      <input type="text" id="letters" maxlength="10" placeholder="t.ex. ABCDE eller AB*DE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <input type="text" id="letters" maxlength="20" placeholder="t.ex. ABCDE eller AB CDE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
       <button class="clear-btn" id="clearLetters" tabindex="-1" aria-label="Rensa">✕</button>
       <span class="char-count" id="charCount">0/10</span>
     </div>
     <p class="hint">
-      Använd <span>*</span> eller <span>?</span> som wildcard (valfri bokstav).<br>
-      Separera flera kombinationer med mellanslag.
+      Separera flera ord med <span>mellanslag</span> – resultaten är alltid hela ord.
     </p>
-  </div>
-
-  <div>
-    <label style="margin-bottom:8px;display:block;">Minsta ordlängd</label>
-    <div class="filter-group" id="minLenGroup">
-      <button class="filter-btn active" data-len="2">2+</button>
-      <button class="filter-btn" data-len="3">3+</button>
-      <button class="filter-btn" data-len="4">4+</button>
-      <button class="filter-btn" data-len="5">5+</button>
-    </div>
-  </div>
-
-  <div>
-    <label style="margin-bottom:8px;display:block;">Sortera efter</label>
-    <div class="filter-group" id="sortGroup">
-      <button class="filter-btn active" data-sort="length">Längd ↓</button>
-      <button class="filter-btn" data-sort="alpha">A–Ö</button>
-      <button class="filter-btn" data-sort="points">Poäng ↓</button>
-    </div>
   </div>
 
   <div style="display:flex;gap:12px;">
@@ -434,6 +414,15 @@
     <div class="input-wrap">
       <input type="text" id="mustContain" placeholder="t.ex. REN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 40px 11px 14px;letter-spacing:0.1em;">
       <button class="clear-btn" id="clearMustContain" tabindex="-1" aria-label="Rensa">✕</button>
+    </div>
+  </div>
+
+  <div>
+    <label style="margin-bottom:8px;display:block;">Sortera efter</label>
+    <div class="filter-group" id="sortGroup">
+      <button class="filter-btn active" data-sort="length">Längd ↓</button>
+      <button class="filter-btn" data-sort="alpha">A–Ö</button>
+      <button class="filter-btn" data-sort="points">Poäng ↓</button>
     </div>
   </div>
 
@@ -573,13 +562,7 @@ function canForm(word, letters) {
     if (idx !== -1) {
       available.splice(idx, 1);
     } else {
-      // try wildcard
-      const wIdx = available.indexOf('*');
-      if (wIdx !== -1) {
-        available.splice(wIdx, 1);
-      } else {
-        return false;
-      }
+      return false;
     }
   }
   return true;
@@ -595,8 +578,8 @@ function search() {
 
   if (!raw && !sw && !ew && !mc) return;
 
-  // Normalize: treat ? as *, split by spaces
-  const groups = raw.replace(/\?/g, '*').split(/\s+/).filter(Boolean);
+  // Normalize: split by spaces, no wildcards
+  const groups = raw.split(/\s+/).filter(Boolean);
   const letters = [...groups.join('')].map(c => c.toLowerCase());
 
   if (letters.length > 10) return;
@@ -651,7 +634,7 @@ function renderResults() {
   const slice = currentResults.slice(0, displayCount);
 
   if (currentResults.length === 0) {
-    container.innerHTML = '<div class="no-results">Inga ord hittades.<br><span style="font-size:0.75em;color:#555">Prova med fler bokstäver eller wildcards (*)</span></div>';
+    container.innerHTML = '<div class="no-results">Inga ord hittades.<br><span style="font-size:0.75em;color:#555">Prova med fler bokstäver eller justera filtren</span></div>';
     return;
   }
 
@@ -708,8 +691,7 @@ function renderResults() {
 // Event listeners
 document.getElementById('letters').addEventListener('input', function() {
   const len = this.value.replace(/\s/g, '').length;
-  document.getElementById('charCount').textContent = `${Math.min(len,10)}/10`;
-  if (len > 10) this.value = this.value.slice(0, this.value.length - (len - 10));
+  document.getElementById('charCount').textContent = `${len}/10`;
   document.getElementById('clearLetters').classList.toggle('visible', this.value.length > 0);
 });
 document.getElementById('clearLetters').addEventListener('touchend', e => {
@@ -753,13 +735,6 @@ document.getElementById('clearMustContain').addEventListener('click', function()
   document.getElementById('mustContain').focus();
 });
 
-document.getElementById('minLenGroup').addEventListener('click', e => {
-  const btn = e.target.closest('[data-len]');
-  if (!btn) return;
-  minLen = parseInt(btn.dataset.len);
-  document.querySelectorAll('[data-len]').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-});
 
 document.getElementById('sortGroup').addEventListener('click', e => {
   const btn = e.target.closest('[data-sort]');
