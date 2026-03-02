@@ -385,7 +385,7 @@
   <div class="input-section">
     <label for="letters">Dina bokstäver (max 10)</label>
     <div class="input-wrap">
-      <input type="text" id="letters" maxlength="20" placeholder="t.ex. ABCDE (mellanslag = *)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <input type="text" id="letters" maxlength="20" placeholder="t.ex. ABCDE (mellanslag = *)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="search">
       <button class="clear-btn" id="clearLetters" tabindex="-1" aria-label="Rensa">✕</button>
       <span class="char-count" id="charCount">0/10</span>
     </div>
@@ -398,13 +398,13 @@
     <div class="input-section" style="flex:1">
       <label for="startsWith">Börjar med</label>
       <div class="input-wrap">
-        <input type="text" id="startsWith" placeholder="t.ex. KA" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
+        <input type="text" id="startsWith" placeholder="t.ex. KA" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="search" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
       </div>
     </div>
     <div class="input-section" style="flex:1">
       <label for="endsWith">Slutar med</label>
       <div class="input-wrap">
-        <input type="text" id="endsWith" placeholder="t.ex. EN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
+        <input type="text" id="endsWith" placeholder="t.ex. EN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="search" style="font-size:1rem;padding:11px 14px;letter-spacing:0.1em;">
       </div>
     </div>
   </div>
@@ -412,7 +412,7 @@
   <div class="input-section">
     <label for="mustContain">Måste innehålla</label>
     <div class="input-wrap">
-      <input type="text" id="mustContain" placeholder="t.ex. REN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="font-size:1rem;padding:11px 40px 11px 14px;letter-spacing:0.1em;">
+      <input type="text" id="mustContain" placeholder="t.ex. REN" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="search" style="font-size:1rem;padding:11px 40px 11px 14px;letter-spacing:0.1em;">
       <button class="clear-btn" id="clearMustContain" tabindex="-1" aria-label="Rensa">✕</button>
     </div>
   </div>
@@ -627,6 +627,14 @@ function search() {
     displayCount = PAGE_SIZE;
     renderResults();
 
+    // Scroll to results
+    setTimeout(() => {
+      const resultsEl = document.getElementById('results');
+      if (resultsEl) {
+        resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+
     status.className = matches.length > 0 ? 'done' : '';
     status.textContent = matches.length > 0
       ? `✓ Hittade ${matches.length} ord`
@@ -718,17 +726,13 @@ document.getElementById('clearLetters').addEventListener('click', function() {
   document.getElementById('letters').focus();
 });
 
-document.getElementById('letters').addEventListener('keydown', e => {
-  if (e.key === 'Enter') search();
-});
-document.getElementById('startsWith').addEventListener('keydown', e => {
-  if (e.key === 'Enter') search();
-});
-document.getElementById('endsWith').addEventListener('keydown', e => {
-  if (e.key === 'Enter') search();
-});
-document.getElementById('mustContain').addEventListener('keydown', e => {
-  if (e.key === 'Enter') search();
+['letters', 'startsWith', 'endsWith', 'mustContain'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); search(); }
+  });
+  // iOS "search" keyboard button fires the search event
+  el.addEventListener('search', () => search());
 });
 document.getElementById('mustContain').addEventListener('input', function() {
   document.getElementById('clearMustContain').classList.toggle('visible', this.value.length > 0);
