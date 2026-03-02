@@ -437,7 +437,6 @@
 </main>
 
 <script>
-let wordList = null;
 let minLen = 2;
 let sortMode = 'length';
 
@@ -450,111 +449,12 @@ const LETTER_POINTS = {
 function wordPoints(word) {
   return [...word].reduce((sum, c) => sum + (LETTER_POINTS[c] || 0), 0);
 }
+
 const PAGE_SIZE = 50;
 let currentResults = [];
 let displayCount = PAGE_SIZE;
 
-// Load word list with localStorage cache
-const WORD_LIST_URL = 'svenska_ord.txt';
-const CACHE_KEY = 'ordletare';
-const MIN_WORDS = 10000;
-
-async function loadWordList() {
-  const status = document.getElementById('status');
-  const bar = document.getElementById('progressBar');
-  const fill = document.getElementById('progressFill');
-  const btn = document.getElementById('searchBtn');
-
-  // Try cache first
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed.length >= MIN_WORDS) {
-        wordList = parsed;
-        status.className = 'done';
-        status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord (från cache)`;
-        btn.disabled = false;
-        btn.textContent = 'Sök ord';
-        return;
-      } else {
-        localStorage.removeItem(CACHE_KEY); // ogiltig cache, ta bort
-      }
-    }
-  } catch(e) { localStorage.removeItem(CACHE_KEY); }
-
-  // Fetch from network
-  status.className = 'loading';
-  status.innerHTML = '<span class="spinner"></span>Laddar ordlista (första gången)…';
-  bar.style.display = 'block';
-
-  try {
-    const res = await fetch(WORD_LIST_URL);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-    const reader = res.body.getReader();
-    const total = parseInt(res.headers.get('content-length') || '0');
-    let received = 0;
-    const chunks = [];
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (total) fill.style.width = Math.round((received / total) * 100) + '%';
-    }
-
-    fill.style.width = '100%';
-
-    // Efficient merge: pre-calculate total size, single allocation
-    const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
-    const merged = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.length; }
-    // Detect encoding from BOM bytes
-    let text;
-    if ((merged[0] === 0xFF && merged[1] === 0xFE) || (merged[0] === 0xFE && merged[1] === 0xFF)) {
-      text = new TextDecoder('utf-16').decode(merged);
-    } else {
-      text = new TextDecoder('utf-8').decode(merged);
-    }
-    // Strip BOM character, handle \r\n, \r, or \n line endings
-    const cleaned = text.replace(/^\uFEFF/, '');
-    const allWords = cleaned.split(/\r\n|\r|\n/).map(w => w.trim().toLowerCase()).filter(w => w.length >= 2);
-    // Accept all unicode letters
-    wordList = allWords.filter(w => /^[\p{L}]+$/u.test(w));
-
-    // Save to cache (skip if list is very large – may exceed localStorage quota)
-    try {
-      const json = JSON.stringify(wordList);
-      if (json.length < 4_500_000) { // ~4.5 MB safety margin
-        localStorage.setItem(CACHE_KEY, json);
-      } else {
-        localStorage.removeItem(CACHE_KEY); // ensure no stale partial entry
-      }
-    } catch(e) {
-      localStorage.removeItem(CACHE_KEY);
-    }
-
-    status.className = 'done';
-    status.textContent = `✓ ${wordList.length.toLocaleString('sv')} ord inlästa och sparade`;
-    btn.disabled = false;
-    btn.textContent = 'Sök ord';
-    bar.style.display = 'none';
-
-  } catch(e) {
-    status.className = 'error';
-    status.textContent = '⚠ Kunde inte ladda ordlistan. Kontrollera anslutningen.';
-    bar.style.display = 'none';
-    btn.textContent = 'Försök igen';
-    btn.disabled = false;
-    btn.onclick = () => { wordList = null; btn.onclick = search; loadWordList(); };
-  }
-}
-
-// Check if a word can be formed from available letters
-// letters: array of chars, some may be '*' (wildcard)
+// --- Helpers (samma som tidigare) ---
 function canForm(word, letters) {
   const available = [...letters];
   for (const ch of word) {
@@ -562,7 +462,6 @@ function canForm(word, letters) {
     if (idx !== -1) {
       available.splice(idx, 1);
     } else {
-      // try wildcard
       const wIdx = available.indexOf('*');
       if (wIdx !== -1) {
         available.splice(wIdx, 1);
@@ -572,68 +471,6 @@ function canForm(word, letters) {
     }
   }
   return true;
-}
-
-async function search() {
-  if (document.activeElement) document.activeElement.blur();
-
-  const raw = document.getElementById('letters').value.trim().toUpperCase();
-  const sw = document.getElementById('startsWith').value.trim().toLowerCase();
-  const ew = document.getElementById('endsWith').value.trim().toLowerCase();
-  const mc = document.getElementById('mustContain').value.trim().toLowerCase();
-
-  if (!raw && !sw && !ew && !mc) return;
-
-  const letters = [...raw.toLowerCase()].map(c => c === ' ' ? '*' : c);
-  if (letters.length > 10) return;
-
-  const status = document.getElementById('status');
-  status.className = 'loading';
-  status.innerHTML = '<span class="spinner"></span>Söker…';
-
-  // Byt ut URL nedan mot din faktiska Worker‑endpoint
-  const WORKER_URL = 'https://wordler.johan-oestberg.workers.dev/api/search';
-
-  try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        letters: raw,
-        startsWith: sw,
-        endsWith: ew,
-        mustContain: mc,
-        sort: sortMode
-      }),
-      // timeout hanteras inte av fetch i alla miljöer; Worker bör svara snabbt
-    });
-
-    if (!res.ok) {
-      throw new Error('HTTP ' + res.status);
-    }
-
-    const matches = await res.json();
-
-    // Samma rendering som tidigare
-    currentResults = Array.isArray(matches) ? matches : [];
-    displayCount = PAGE_SIZE;
-    renderResults();
-
-    setTimeout(() => {
-      const resultsEl = document.getElementById('results');
-      if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-
-    status.className = currentResults.length > 0 ? 'done' : '';
-    status.textContent = currentResults.length > 0
-      ? `✓ Hittade ${currentResults.length} ord`
-      : currentResults.length === 0 ? 'Inga ord hittades.' : '';
-
-  } catch (err) {
-    status.className = 'error';
-    status.textContent = '⚠ Kunde inte kontakta sök‑API. Kontrollera Worker och nätverk.';
-    console.error('Search API error:', err);
-  }
 }
 
 function renderResults() {
@@ -649,7 +486,6 @@ function renderResults() {
   let rows = '';
 
   if (sortMode === 'length') {
-    // Group by word length
     let lastLen = null;
     slice.forEach((w, i) => {
       if (w.length !== lastLen) {
@@ -695,9 +531,77 @@ function renderResults() {
   }
 }
 
-// Event listeners
+// --- Ny search() som anropar din Worker ---
+async function search() {
+  if (document.activeElement) document.activeElement.blur();
+
+  const raw = document.getElementById('letters').value.trim().toUpperCase();
+  const sw = document.getElementById('startsWith').value.trim().toLowerCase();
+  const ew = document.getElementById('endsWith').value.trim().toLowerCase();
+  const mc = document.getElementById('mustContain').value.trim().toLowerCase();
+
+  if (!raw && !sw && !ew && !mc) return;
+
+  const letters = [...raw.toLowerCase()].map(c => c === ' ' ? '*' : c);
+  if (letters.length > 10) return;
+
+  const status = document.getElementById('status');
+  status.className = 'loading';
+  status.innerHTML = '<span class="spinner"></span>Söker…';
+
+  // Din Worker endpoint
+  const WORKER_URL = 'https://wordler.johan-oestberg.workers.dev/api/search';
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+        // 'X-Api-Key': 'din-nyckel' // avkommentera om du använder MY_API_KEY
+      },
+      body: JSON.stringify({
+        letters: raw,
+        startsWith: sw,
+        endsWith: ew,
+        mustContain: mc,
+        sort: sortMode,
+        page: 0,
+        pageSize: 200
+      })
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Worker error', res.status, text);
+      throw new Error('HTTP ' + res.status + ' — ' + text);
+    }
+
+    const data = await res.json();
+
+    // data.results innehåller arrayen med ord enligt Worker‑koden
+    currentResults = Array.isArray(data.results) ? data.results : [];
+    displayCount = PAGE_SIZE;
+    renderResults();
+
+    setTimeout(() => {
+      const resultsEl = document.getElementById('results');
+      if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+
+    status.className = currentResults.length > 0 ? 'done' : '';
+    status.textContent = currentResults.length > 0
+      ? `✓ Hittade ${currentResults.length} ord`
+      : currentResults.length === 0 ? 'Inga ord hittades.' : '';
+
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = '⚠ Kunde inte kontakta sök‑API. Kontrollera Worker och nätverk.';
+    console.error('Search API error:', err);
+  }
+}
+
+// --- UI event listeners (oförändrade) ---
 document.getElementById('letters').addEventListener('input', function() {
-  // Convert spaces to wildcards
   const cursorPos = this.selectionStart;
   const hadSpace = this.value.includes(' ');
   this.value = this.value.replace(/ /g, '*');
@@ -725,7 +629,6 @@ document.getElementById('clearLetters').addEventListener('click', function() {
   el.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); search(); }
   });
-  // iOS "search" keyboard button fires the search event
   el.addEventListener('search', () => search());
 });
 document.getElementById('mustContain').addEventListener('input', function() {
@@ -742,7 +645,6 @@ document.getElementById('clearMustContain').addEventListener('click', function()
   this.classList.remove('visible');
   document.getElementById('mustContain').focus();
 });
-
 
 document.getElementById('sortGroup').addEventListener('click', e => {
   const btn = e.target.closest('[data-sort]');
@@ -763,7 +665,6 @@ document.getElementById('sortGroup').addEventListener('click', e => {
   }
 });
 
-// Fix iOS double-tap: use touchend to fire search before keyboard dismisses
 const searchBtn = document.getElementById('searchBtn');
 searchBtn.addEventListener('touchend', e => {
   e.preventDefault();
@@ -771,8 +672,11 @@ searchBtn.addEventListener('touchend', e => {
 });
 searchBtn.addEventListener('click', search);
 
-// Start loading
-loadWordList();
+// --- Init: aktivera sökknappen (ingen lokal inläsning längre) ---
+document.getElementById('status').className = '';
+document.getElementById('status').textContent = '';
+searchBtn.disabled = false;
+searchBtn.textContent = 'Sök ord';
 </script>
 </body>
 </html>
