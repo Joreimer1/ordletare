@@ -574,9 +574,7 @@ function canForm(word, letters) {
   return true;
 }
 
-function search() {
-  if (!wordList) { loadWordList(); return; }
-  // Dismiss virtual keyboard on mobile
+async function search() {
   if (document.activeElement) document.activeElement.blur();
 
   const raw = document.getElementById('letters').value.trim().toUpperCase();
@@ -586,62 +584,56 @@ function search() {
 
   if (!raw && !sw && !ew && !mc) return;
 
-  // Normalize: spaces already converted to * by input handler
   const letters = [...raw.toLowerCase()].map(c => c === ' ' ? '*' : c);
-
   if (letters.length > 10) return;
 
   const status = document.getElementById('status');
   status.className = 'loading';
   status.innerHTML = '<span class="spinner"></span>Söker…';
 
-  // Async so UI updates
-  setTimeout(() => {
-    const wildcardCount = letters.filter(c => c === '*').length;
-    const realLetters = letters.filter(c => c !== '*');
+  // Byt ut URL nedan mot din faktiska Worker‑endpoint
+  const WORKER_URL = 'wordler.johan-oestberg.workers.dev';
 
-    const matches = wordList.filter(word => {
-      if (word.length < minLen) return false;
-      if (sw && !word.startsWith(sw)) return false;
-      if (ew && !word.endsWith(ew)) return false;
-      if (mc && !word.includes(mc)) return false;
-      // If letters given: the middle part of the word (excluding sw/ew) must be formable from letters
-      if (letters.length > 0) {
-        const start = sw.length;
-        const end = ew.length > 0 ? word.length - ew.length : word.length;
-        if (start > end) return false;
-        const middle = word.slice(start, end);
-        if (middle.length > letters.length) return false;
-        if (!canForm(middle, letters)) return false;
-      }
-      return true;
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        letters: raw,
+        startsWith: sw,
+        endsWith: ew,
+        mustContain: mc,
+        sort: sortMode
+      }),
+      // timeout hanteras inte av fetch i alla miljöer; Worker bör svara snabbt
     });
 
-    if (sortMode === 'length') {
-      matches.sort((a, b) => b.length - a.length || a.localeCompare(b, 'sv'));
-    } else if (sortMode === 'points') {
-      matches.sort((a, b) => wordPoints(b) - wordPoints(a) || b.length - a.length);
-    } else {
-      matches.sort((a, b) => a.localeCompare(b, 'sv'));
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
     }
 
-    currentResults = matches;
+    const matches = await res.json();
+
+    // Samma rendering som tidigare
+    currentResults = Array.isArray(matches) ? matches : [];
     displayCount = PAGE_SIZE;
     renderResults();
 
-    // Scroll to results
     setTimeout(() => {
       const resultsEl = document.getElementById('results');
-      if (resultsEl) {
-        resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
 
-    status.className = matches.length > 0 ? 'done' : '';
-    status.textContent = matches.length > 0
-      ? `✓ Hittade ${matches.length} ord`
-      : matches.length === 0 ? 'Inga ord hittades.' : '';
-  }, 10);
+    status.className = currentResults.length > 0 ? 'done' : '';
+    status.textContent = currentResults.length > 0
+      ? `✓ Hittade ${currentResults.length} ord`
+      : currentResults.length === 0 ? 'Inga ord hittades.' : '';
+
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = '⚠ Kunde inte kontakta sök‑API. Kontrollera Worker och nätverk.';
+    console.error('Search API error:', err);
+  }
 }
 
 function renderResults() {
