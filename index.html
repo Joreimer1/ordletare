@@ -576,6 +576,8 @@ function canForm(word, letters) {
 
 function search() {
   if (!wordList) { loadWordList(); return; }
+  // Dismiss virtual keyboard on mobile
+  if (document.activeElement) document.activeElement.blur();
 
   const raw = document.getElementById('letters').value.trim().toUpperCase();
   const sw = document.getElementById('startsWith').value.trim().toLowerCase();
