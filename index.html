@@ -592,7 +592,7 @@ async function search() {
   status.innerHTML = '<span class="spinner"></span>Söker…';
 
   // Byt ut URL nedan mot din faktiska Worker‑endpoint
-  const WORKER_URL = 'wordler.johan-oestberg.workers.dev';
+  const WORKER_URL = 'https://wordler.johan-oestberg.workers.dev/api/search';
 
   try {
     const res = await fetch(WORKER_URL, {
